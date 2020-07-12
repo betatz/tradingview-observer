@@ -7,14 +7,18 @@
     "48": "icons/icon_48.png",
     "128": "icons/icon_128.png"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://*.tradingview.com/chart/*"],
+      "js": ["content.js"]
+    }
+  ],
   "browser_action": {
     "default_title": "tradingview-observer",
     "default_popup": "popup/popup.html"
   },
   "background": {
-    "scripts": [
-      "background.js"
-    ]
+    "scripts": ["background.js"]
   },
   "options_ui": {
     "page": "options/options.html",

@@ -9,8 +9,10 @@ const { version } = require('./package.json');
 const config = {
   mode: process.env.NODE_ENV,
   context: __dirname + '/src',
+  devtool: 'source-map',
   entry: {
     'background': './background.js',
+    'content': './content.js',
     'popup/popup': './popup/popup.js',
     'options/options': './options/options.js',
   },
