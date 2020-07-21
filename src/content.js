@@ -133,13 +133,42 @@ function connectServer() {
 //     });
 // }, 20000);
 
+var observers = [];
+
+var observeIndicator = function(dataWindowList) {
+    var itemList = document.querySelector('div.active div.chart-data-window div.box');
+    var windowList = document.querySelector('div.chart-data-window');
+    // console.log(itemList.length);
+    var observer = new MutationObserver(function (mutations, me) {
+        // `mutations` is an array of mutations that occurred
+        // `me` is the MutationObserver instance
+        console.log('mutation');
+        console.log(mutations);
+    });
+    observer.observe(itemList, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true
+    });
+    observers.push(observer);
+}
+
 var checkDataWindow = function() {
     console.log('checking data window.');
-    var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow');
-    
+    var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window');
+    // var dataWindowList = document.getElementsByClassName('div.active > div.widgetbar-widget-datawindow div.chart-data-window');
     if (dataWindowList.length > 0) {
+        if (observers.length === 0) {
+            console.log('Start observe.');
+            observeIndicator(dataWindowList);
+        }
         console.log('Data window available.');
     } else {
+        observers.forEach(item => {
+            item.disconnect();
+        });
+        observers = [];
         console.log('Data window unavailable.');
     }
 
@@ -148,4 +177,72 @@ var checkDataWindow = function() {
     }, 5000);
 };
 
-checkDataWindow();
+// checkDataWindow();
+
+const KEY_SYMBOL = 'symbol';
+const KEY_INTERVAL = 'interval';
+const KEY_EXCHANGE = 'exchange';
+const KEY_DATE = 'date';
+const KEY_TIME = 'time';
+
+var prevTimeText = {'date': '', 'time': ''};
+var startTime;
+
+
+
+const uploadData = function() {
+
+};
+
+const parseDateTime = function(boxNode) {
+
+}
+
+const parseBaseInfo = function(boxNode) {
+    var baseInfo = {symbol: '', exchange: '', interval: 0};
+    if (boxNode.firstChild) {
+        if (boxNode.firstChild.firstChild) {
+            const title = boxNode.firstChild.firstChild.innerText;
+            const titleList = title.split(', ');
+            if (titleList.length === 3) {
+                baseInfo['symbol'] = titleList[0];
+                baseInfo['exchange'] = titleList[2];
+                baseInfo['interval'] = titleList[1];
+            }
+        }
+    }
+
+    return baseInfo;
+}
+
+
+const checkDataThenUpload = function() {
+    console.log('Checking data');
+    var interval = 1000;
+
+    var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window');
+    if (dataWindowList.length > 0) {
+        const boxList = document.querySelectorAll('div.chart-data-window div.box');
+        if (boxList.length > 1) {
+            const timeBox = boxList.item(0);
+            const baseBox = boxList.item(1);
+            const baseInfo = parseBaseInfo(baseBox);
+            console.log(baseInfo);
+        }
+    } else {
+        interval = 3000;
+    }
+
+    setTimeout(function() {
+        checkDataThenUpload();
+    }, interval);
+}
+
+const startCheck = function() {
+    setTimeout(function() {
+        startTime = new Date().getTime();
+        checkDataThenUpload();
+    }, 1000 * 10)
+};
+
+startCheck();
