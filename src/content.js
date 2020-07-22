@@ -21,84 +21,6 @@ function RGBToHex(rgb) {
     return hexColor;
 };
 
-function allCaps(str) {
-    var tab = new Array();
-    var strCount = str.length;
-    for (var i = 0; i < str.length; i++) {
-        var c = str[i];
-        if (c < 'A' || c > 'Z') {
-        } else {
-            // console.log(c);
-            tab.push(c)
-        };
-    };
-    //var string = tab.join(tab);
-    return tab.join("")
-};
-
-function readIndicatorData() {
-    var indicatorsCount = document.querySelectorAll(' div.chart-data-window > div').length;
-    console.log('指标的个数', indicatorsCount);
-
-    var tab = {};
-    tab['datetime'] = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value')[0].innerText + ' ' + document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value')[1].innerText
-    tab['ex'] = document.querySelectorAll('div.chart-data-window-header>span')[1].outerText.split(",")[1]
-
-    var b = 2;
-    for (var i = 1; i < indicatorsCount; i++) {
-        //取得标题
-        // console.log('值', i);
-        //取得标题
-        var x = document.querySelectorAll('div.chart-data-window-header')[i].children[0].title;
-        // tab.push({name: x});
-        //取得数量
-        var y = document.querySelectorAll('div.chart-data-window-body')[i].children.length;
-        //console.log(y)
-        //取得指标的的大写字母 缩写
-        var capsStr = allCaps(x)
-        for (var k = 0; k < y; k++) {
-            //取出值
-            //  console.log("K的值为", k);
-            //console.log("i",i,"k",k)
-            // console.log(b)
-
-            var indicatorsName = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-title')[b].innerText;//指标的参数名
-            var indicatorsValue = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value')[b].innerText;//指标的参数值
-            var indicatorscolor = RGBToHex(document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value')[b].children[0].style.color)
-            //console.log("指标的参数名",indicatorsName,"指标的参数值",indicatorsValue);
-            if (!tab[capsStr + indicatorsName]) {
-                tab[capsStr + indicatorsName] = { value: indicatorsValue, name: capsStr, color: indicatorscolor };
-            } else {
-                tab[capsStr + indicatorsName + k] = { value: indicatorsValue, name: capsStr, color: indicatorscolor };
-            };
-            b++
-        }
-    }
-    console.log(tab);
-    if (ws) {
-        ws.send(JSON.stringify(tab));
-    }
-    return tab;
-    
-}
-
-function handleChartDataWindow(chartDataWindow) { 
-    console.log('hello chart data');
-    readIndicatorData();
- }
-
-// set up the mutation observer
-var observer = new MutationObserver(function (mutations, me) {
-    // `mutations` is an array of mutations that occurred
-    // `me` is the MutationObserver instance
-    var chartDataWindowList = document.getElementsByClassName('chart-data-window');
-    if (chartDataWindowList) {
-        me.disconnect(); // stop observing
-        handleChartDataWindow(chartDataWindowList);
-        return;
-    }
-});
-
 var ws;
 
 function connectServer() {
@@ -125,94 +47,106 @@ function connectServer() {
 
 // connectServer();
 
-// // start observing
-// setTimeout(function() {
-//     observer.observe(document, {
-//         childList: true,
-//         subtree: true
-//     });
-// }, 20000);
-
-var observers = [];
-
-var observeIndicator = function(dataWindowList) {
-    var itemList = document.querySelector('div.active div.chart-data-window div.box');
-    var windowList = document.querySelector('div.chart-data-window');
-    // console.log(itemList.length);
-    var observer = new MutationObserver(function (mutations, me) {
-        // `mutations` is an array of mutations that occurred
-        // `me` is the MutationObserver instance
-        console.log('mutation');
-        console.log(mutations);
-    });
-    observer.observe(itemList, {
-        attributes: true,
-        characterData: true,
-        childList: true,
-        subtree: true
-    });
-    observers.push(observer);
-}
-
-var checkDataWindow = function() {
-    console.log('checking data window.');
-    var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window');
-    // var dataWindowList = document.getElementsByClassName('div.active > div.widgetbar-widget-datawindow div.chart-data-window');
-    if (dataWindowList.length > 0) {
-        if (observers.length === 0) {
-            console.log('Start observe.');
-            observeIndicator(dataWindowList);
-        }
-        console.log('Data window available.');
-    } else {
-        observers.forEach(item => {
-            item.disconnect();
-        });
-        observers = [];
-        console.log('Data window unavailable.');
-    }
-
-    setTimeout(function () {
-        checkDataWindow();
-    }, 5000);
-};
-
-// checkDataWindow();
-
-const KEY_SYMBOL = 'symbol';
-const KEY_INTERVAL = 'interval';
-const KEY_EXCHANGE = 'exchange';
-const KEY_DATE = 'date';
-const KEY_TIME = 'time';
-
-var prevTimeText = {'date': '', 'time': ''};
+var prevTimeText = {date: '', time: ''};
 var startTime;
 
 
 
-const uploadData = function() {
+const uploadData = function(data, timeout) {
 
 };
 
-const parseDateTime = function(boxNode) {
+const parseIndicators = function() {
+    const indicatorsCount = document.querySelectorAll(' div.chart-data-window > div').length;
+    const indicatorData = [];
 
-}
+    var index = 2;
+    for (var i = 1; i < indicatorsCount; i++) {
+        const title = document.querySelectorAll('div.chart-data-window-header')[i].children[0].title;
+        const params = [];
 
-const parseBaseInfo = function(boxNode) {
-    var baseInfo = {symbol: '', exchange: '', interval: 0};
-    if (boxNode.firstChild) {
-        if (boxNode.firstChild.firstChild) {
-            const title = boxNode.firstChild.firstChild.innerText;
-            const titleList = title.split(', ');
-            if (titleList.length === 3) {
-                baseInfo['symbol'] = titleList[0];
-                baseInfo['exchange'] = titleList[2];
-                baseInfo['interval'] = titleList[1];
+        const bodyCount = document.querySelectorAll('div.chart-data-window-body')[i].children.length;
+        for (var j = 0; j < bodyCount; j++) {
+            var paramName = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-title')[index].innerText;//指标的参数名
+            var paramValue = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value')[index].innerText;//指标的参数值
+            var paramColor = RGBToHex(document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value')[index].children[0].style.color)
+            
+            params.push({name: paramName, value: paramValue, color: paramColor});
+
+            index += 1;
+        }
+        indicatorData.push({name: title, params: params});
+    }
+
+    return indicatorData;
+};
+
+const parseDateTime = function() {
+    const titleList = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-title');
+    const itemList = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value');
+    var dateText = null;
+    var timeText = '';
+    if (titleList.length > 0 && itemList.length > 0) {
+        if (titleList.item(0).innerText.toLowerCase() === 'date') {
+            dateText = itemList.item(0).innerText;
+        }
+    }
+
+    if (titleList.length > 1 && itemList.length > 1) {
+        if (titleList.item(1).innerText.toLowerCase() === 'time') {
+            timeText = itemList.item(1).innerText;
+        }
+    }
+
+    if (dateText) {
+        return {date: dateText, time: timeText};
+    }
+
+    return null;
+};
+
+const parseInterval = function(intervalStr) {
+    var times = 1000 * 60;
+    intervalStr = intervalStr.toLowerCase();
+    var numStr = intervalStr;
+    var endPos = intervalStr.length;
+    if (intervalStr.lastIndexOf('h') != -1) {
+        endPos = intervalStr.lastIndexOf('h');
+        times = 1000 * 60 * 60;
+    } else if (intervalStr.lastIndexOf('d') != -1) {
+        endPos = intervalStr.lastIndexOf('d');
+        times = 1000 * 60 * 60 * 24;
+    } else if (intervalStr.lastIndexOf('w') != -1) {
+        endPos = intervalStr.lastIndexOf('w');
+        times = 1000 * 60 * 60 * 24 * 7;
+    } else if (intervalStr.lastIndexOf('m') != -1) {
+        endPos = intervalStr.lastIndexOf('m');
+        times = 1000 * 60 * 60 * 24 * 7 * 30;
+    }
+
+    numStr = intervalStr.substring(0, endPos);
+    const num = parseInt(numStr);
+    if (!isNaN(num)) {
+        return num * times;
+    } else {
+        return NaN;
+    }
+};
+
+const parseBaseInfo = function() {
+    const headerList = document.querySelectorAll('div.chart-data-window-header>span');
+    if (headerList.length > 1) {
+        const title = headerList.item(1).innerText;
+        const titleList = title.split(', ');
+        if (titleList.length === 3) {
+            const interval = parseInterval(titleList[1]);
+            if (!isNaN(interval)) {
+                return { symbol: titleList[0], exchange: titleList[2], interval: interval };
             }
         }
     }
 
-    return baseInfo;
+    return null;
 }
 
 
@@ -220,15 +154,16 @@ const checkDataThenUpload = function() {
     console.log('Checking data');
     var interval = 1000;
 
-    var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window');
+    var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window>div');
     if (dataWindowList.length > 0) {
-        const boxList = document.querySelectorAll('div.chart-data-window div.box');
-        if (boxList.length > 1) {
-            const timeBox = boxList.item(0);
-            const baseBox = boxList.item(1);
-            const baseInfo = parseBaseInfo(baseBox);
-            console.log(baseInfo);
-        }
+        const baseInfo = parseBaseInfo();
+        console.log(baseInfo);
+
+        const dateTime = parseDateTime();
+        console.log(dateTime);
+        
+        const indicators = parseIndicators();
+        console.log(indicators);
     } else {
         interval = 3000;
     }
