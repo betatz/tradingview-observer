@@ -1,6 +1,6 @@
 function RGBToHex(rgb) {
     var regexp = /[0-9]{0,3}/g;
-    var re = rgb.match(regexp);//利用正则表达式去掉多余的部分，将rgb中的数字提取
+    var re = rgb.match(regexp);
     var hexColor = "#";
     var hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
     for (var i = 0; i < re.length; i++) {
@@ -17,11 +17,16 @@ function RGBToHex(rgb) {
         }
         hexColor += hexAr.reverse().join('');
     }
-    //alert(hexColor)
+
     return hexColor;
 };
 
 var ws;
+var prevInterval = -1;
+var prevTimeInfo = null;
+var firstSend = false;
+var startTime = new Date().getTime();
+var lastUploadTime = new Date().getTime();
 
 function connectServer() {
     ws = new WebSocket('ws://127.0.0.1:18888/upload');
@@ -45,15 +50,40 @@ function connectServer() {
     };
 }
 
-// connectServer();
+const uploadData = function(data, currInterval, currTimeInfo) {
+    if (ws) {
+        try {
+            console.log('send');
+            ws.send(JSON.stringify(data));
+            lastUploadTime = new Date().getTime();
+            prevInterval = currInterval;
+            prevTimeInfo = currTimeInfo;
+        } catch (error) {
+            console.log(error);
+        }
+    }
+};
 
-var prevTimeText = {date: '', time: ''};
-var startTime;
-
-
-
-const uploadData = function(data, timeout) {
-
+const uploadIndicators = function(baseInfo, timeInfo, timeout) {
+    console.log('indicator start');
+    console.log(timeout);
+    setTimeout(function() {
+        console.log('upload indicators');
+        const indicators = parseIndicators();
+        const data = {
+            version: 1,
+            msgId: '',
+            msgType: 'indicator',
+            msgSource: 'tv',
+            data: {
+                code: 0,
+                messsage: '',
+                tradeInfo: baseInfo,
+                indicators: indicators
+            }
+        };
+        uploadData(data, baseInfo.interval, timeInfo);
+    }, timeout);
 };
 
 const parseIndicators = function() {
@@ -126,11 +156,7 @@ const parseInterval = function(intervalStr) {
 
     numStr = intervalStr.substring(0, endPos);
     const num = parseInt(numStr);
-    if (!isNaN(num)) {
-        return num * times;
-    } else {
-        return NaN;
-    }
+    return num * times;
 };
 
 const parseBaseInfo = function() {
@@ -149,34 +175,87 @@ const parseBaseInfo = function() {
     return null;
 }
 
+const calcStartTime = function(now, interval) {
+    return calcIntervalTimestamp(now, interval, 0);
+}
 
-const checkDataThenUpload = function() {
-    console.log('Checking data');
+const calcEndTime = function(now, interval) {
+    return calcIntervalTimestamp(now, interval, 1);
+}
+
+const calcIntervalTimestamp = function(now, interval, step) {
+    const times = Math.floor(now / interval);
+    return interval * (times + step)
+}
+
+const checkDataThenUpload = function(lastInterval) {
     var interval = 1000;
+    const now = new Date().getTime();
+    var sendFlag = false;
 
     var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window>div');
     if (dataWindowList.length > 0) {
-        const baseInfo = parseBaseInfo();
-        console.log(baseInfo);
+        try {
+            const baseInfo = parseBaseInfo();
+            const timeInfo = parseDateTime();
 
-        const dateTime = parseDateTime();
-        console.log(dateTime);
+            if (baseInfo == null || timeInfo == null) {
+                // TODO
+            } else {
+                const currInterval = baseInfo.interval;
+                console.log(prevInterval);
+                console.log(currInterval);
+                console.log(prevTimeInfo);
+                console.log(timeInfo);
+                if (prevInterval != currInterval) {
+                    sendFlag = true;
+                } else {
+                    if ('time' in prevTimeInfo && 'time' in timeInfo) {
+                        if (prevTimeInfo['time'] != timeInfo['time']) {
+                            sendFlag = true;
+                        }
+                    } else if ('date' in prevTimeInfo && 'date' in timeInfo) {
+                        if (prevTimeInfo['date'] != timeInfo['date']) {
+                            sendFlag = true;
+                        }
+                    }
+                }
+
+                if (sendFlag) {
+                    console.log('upload');
+                    interval = 2000;
+                    uploadIndicators(baseInfo, timeInfo, 33);
+                    console.log('upload end');
+                } else {
+                    const endTime = calcEndTime(now, baseInfo.interval);
+                    console.log(endTime);
+                    const diff = endTime - now;
+                    interval = diff * 0.618;
+                    console.log(interval);
+                    if (interval > lastInterval) {
+                        interval = lastInterval;
+                    }
+                    if (interval < 33) {
+                        interval = 33;
+                    }
+                }
+            }
+        } catch(error){
+            // TODO
+        }
         
-        const indicators = parseIndicators();
-        console.log(indicators);
-    } else {
-        interval = 3000;
-    }
+    } 
 
     setTimeout(function() {
-        checkDataThenUpload();
+        checkDataThenUpload(interval);
     }, interval);
 }
 
 const startCheck = function() {
+    connectServer();
     setTimeout(function() {
         startTime = new Date().getTime();
-        checkDataThenUpload();
+        checkDataThenUpload(10 * 1000);
     }, 1000 * 10)
 };
 
