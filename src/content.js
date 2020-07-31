@@ -82,8 +82,6 @@ const uploadIndicators = function(baseInfo, timeInfo, timeout) {
       msgSource: 'tv',
       occurTime: now,
       data: {
-        code: 0,
-        messsage: '',
         tradeInfo: baseInfo,
         timePeriod: { start: start, end: end },
         indicators: indicators,
