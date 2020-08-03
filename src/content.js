@@ -188,6 +188,10 @@ const calcEndTime = function(now, interval) {
   return calcIntervalTimestamp(now, interval, 0);
 };
 
+const calcNowEndTime = function(now, interval) {
+  return calcIntervalTimestamp(now, interval, 1);
+};
+
 const calcIntervalTimestamp = function(now, interval, step) {
   const times = Math.floor(now / interval);
   return interval * (times + step);
@@ -229,8 +233,9 @@ const checkDataThenUpload = function(lastInterval) {
           uploadIndicators(baseInfo, timeInfo, 33);
           console.log('upload end');
         } else {
-          const endTime = calcEndTime(now, baseInfo.interval);
+          const endTime = calcNowEndTime(now, baseInfo.interval);
           console.log(endTime);
+          console.log(now);
           const diff = endTime - now;
           interval = diff * 0.618;
           console.log(interval);
