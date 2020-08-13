@@ -31,7 +31,7 @@ var startTime = new Date().getTime();
 var lastUploadTime = new Date().getTime();
 
 function connectServer() {
-  ws = new WebSocket('ws://127.0.0.1:18888/upload');
+  ws = new WebSocket('ws://127.0.0.1:18888/signal/upload');
   ws.onopen = function(event) {
     console.log('Server connected!');
   };
@@ -59,22 +59,43 @@ const uploadData = function(data, currInterval, currTimeInfo) {
       ws.send(JSON.stringify(data));
       lastUploadTime = new Date().getTime();
       prevInterval = currInterval;
-      prevTimeInfo = currTimeInfo;
+      if (currTimeInfo) {
+        prevTimeInfo = currTimeInfo;
+      }
     } catch (error) {
       console.log(error);
     }
   }
 };
 
-const uploadIndicators = function(baseInfo, timeInfo, timeout) {
+const uploadBarCloseIndicators = function(barTime, baseInfo, indicators) {
+  const now = new Date().getTime();
+  const start = calcStartTime(barTime, baseInfo.interval);
+  const end = calcEndTime(barTime, baseInfo.interval);
+  const data = {
+    version: 1,
+    msgId: '',
+    msgType: 'indicator',
+    msgSource: 'tv',
+    occurTime: now,
+    data: {
+      tradeInfo: baseInfo,
+      timePeriod: { start: start, end: end },
+      indicators: indicators,
+    },
+  };
+  uploadData(data, baseInfo.interval);
+};
+
+const uploadIndicators = function(baseInfo, barTime, timeout) {
   console.log('indicator start');
   console.log(timeout);
   setTimeout(function() {
     console.log('upload indicators');
     const indicators = parseIndicators();
     const now = new Date().getTime();
-    const start = calcStartTime(now, baseInfo.interval);
-    const end = calcEndTime(now, baseInfo.interval);
+    const start = calcStartTime(barTime, baseInfo.interval);
+    const end = calcEndTime(barTime, baseInfo.interval);
     const data = {
       version: 1,
       msgId: '',
@@ -120,7 +141,7 @@ const parseDateTime = function() {
   const titleList = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-title');
   const itemList = document.querySelectorAll('div.chart-data-window-body>div>div.chart-data-window-item-value');
   var dateText = null;
-  var timeText = '';
+  var timeText = null;
   if (titleList.length > 0 && itemList.length > 0) {
     if (titleList.item(0).innerText.toLowerCase() === 'date') {
       dateText = itemList.item(0).innerText;
@@ -134,10 +155,14 @@ const parseDateTime = function() {
   }
 
   if (dateText) {
-    return { date: dateText, time: timeText };
+    if (timeText) {
+      return Date.parse(dateText + ' ' + timeText);
+    } else {
+      return Date.parse(dateText);
+    }
   }
 
-  return null;
+  return 0;
 };
 
 const parseInterval = function(intervalStr) {
@@ -206,9 +231,9 @@ const checkDataThenUpload = function(lastInterval) {
   if (dataWindowList.length > 0) {
     try {
       const baseInfo = parseBaseInfo();
-      const timeInfo = parseDateTime();
+      const currBarTime = parseDateTime();
 
-      if (baseInfo == null || timeInfo == null) {
+      if (baseInfo == null || currBarTime == 0) {
         // TODO
       } else {
         const currInterval = baseInfo.interval;
@@ -216,12 +241,12 @@ const checkDataThenUpload = function(lastInterval) {
         if (prevInterval != currInterval) {
           sendFlag = true;
         } else {
-          if ('time' in prevTimeInfo && 'time' in timeInfo) {
-            if (prevTimeInfo['time'] != timeInfo['time']) {
+          if ('time' in prevTimeInfo && 'time' in currBarTime) {
+            if (prevTimeInfo['time'] != currBarTime['time']) {
               sendFlag = true;
             }
-          } else if ('date' in prevTimeInfo && 'date' in timeInfo) {
-            if (prevTimeInfo['date'] != timeInfo['date']) {
+          } else if ('date' in prevTimeInfo && 'date' in currBarTime) {
+            if (prevTimeInfo['date'] != currBarTime['date']) {
               sendFlag = true;
             }
           }
@@ -230,7 +255,7 @@ const checkDataThenUpload = function(lastInterval) {
         if (sendFlag) {
           console.log('upload');
           interval = 2000;
-          uploadIndicators(baseInfo, timeInfo, 33);
+          uploadIndicators(baseInfo, currBarTime, 33);
           console.log('upload end');
         } else {
           const endTime = calcNowEndTime(now, baseInfo.interval);
@@ -265,4 +290,68 @@ const startCheck = function() {
   }, 1000 * 10);
 };
 
-startCheck();
+// startCheck();
+
+var cachedIndicators = null;
+var prevBarTime = 0;
+
+const observeVolume = function() {
+  const target = document.querySelector('.sourcesWrapper-2JcXD9TK .valueValue-3kA0oJs5');
+  if (target) {
+    console.log('find target');
+    const observer = new MutationObserver(mutationsList => {
+      console.log('Mutation detected!');
+      var dataWindowList = document.querySelectorAll('div.active > div.widgetbar-widget-datawindow div.chart-data-window>div');
+      if (dataWindowList.length > 0) {
+        try {
+          const baseInfo = parseBaseInfo();
+          const currBarTime = parseDateTime();
+
+          if (baseInfo == null || currBarTime == 0) {
+            return;
+          }
+
+          const indicators = parseIndicators();
+          const now = new Date().getTime();
+          const timeDiff = now - currBarTime;
+          const barTimeDiff = currBarTime - prevBarTime;
+          console.log(timeDiff);
+          console.log(barTimeDiff);
+          console.log(baseInfo.interval);
+          if (timeDiff > baseInfo.interval + 10 * 1000) {
+            uploadBarCloseIndicators(currBarTime, baseInfo, indicators);
+          } else {
+            if (barTimeDiff == baseInfo.interval) {
+              uploadBarCloseIndicators(currBarTime, baseInfo, cachedIndicators);
+            } else {
+              cachedIndicators = indicators;
+            }
+            prevBarTime = currBarTime;
+          }
+        } catch (error) {
+          console.log(error);
+        }
+      }
+    });
+
+    observer.observe(target, {
+      characterData: true,
+      attributes: false,
+      childList: false,
+      subtree: true,
+    });
+  } else {
+    setTimeout(function() {
+      observeVolume();
+    }, 1000 * 10);
+  }
+};
+
+const startObserve = function() {
+  connectServer();
+  setTimeout(function() {
+    observeVolume();
+  }, 1000 * 10);
+};
+
+startObserve();
