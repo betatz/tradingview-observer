@@ -53,7 +53,7 @@ function connectServer() {
 }
 
 const uploadData = function(data, currInterval, currTimeInfo) {
-  if (ws) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
     try {
       console.log('send');
       ws.send(JSON.stringify(data));
@@ -156,9 +156,9 @@ const parseDateTime = function() {
 
   if (dateText) {
     if (timeText) {
-      return Date.parse(dateText + ' ' + timeText);
+      return Date.parse(dateText + ' ' + timeText + ':00 GMT');
     } else {
-      return Date.parse(dateText);
+      return Date.parse(dateText + '00:00:00 GMT');
     }
   }
 
