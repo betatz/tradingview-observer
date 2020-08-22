@@ -75,8 +75,8 @@ const uploadBarCloseIndicators = function(barTime, baseInfo, indicators) {
   const data = {
     version: 1,
     msgId: '',
-    msgType: 'indicator',
-    msgSource: 'tv',
+    msgType: 'tvIndicator',
+    msgSource: 'tvSpider',
     occurTime: now,
     data: {
       tradeInfo: baseInfo,
